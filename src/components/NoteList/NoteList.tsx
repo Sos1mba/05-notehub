@@ -1,47 +1,48 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchNotes, deleteNote } from '../../services/noteService';
-import css from './NoteList.module.css';
-import type { Note } from '../../types/note';
-import Loader from '../Loader/Loader';
+import {type Note} from "../../types/note";
+import css from "./NoteList.module.css";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { removeNote } from "../../services/noteService";
+import iziToast from "izitoast";
 
 interface NoteListProps {
-  page: number;
-  search: string;
+  notes: Note[];
 }
 
-function NoteList({ page, search }: NoteListProps) {
+export default function NoteList({ notes }: NoteListProps) {
   const queryClient = useQueryClient();
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['notes', page, search],
-    queryFn: () => fetchNotes({ page, search }),
-  });
-
-  const { mutate } = useMutation({
-    mutationFn: deleteNote,
+  const deleteNote = useMutation({
+    mutationFn: (id: number) => removeNote(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] });
+      queryClient.invalidateQueries({
+        queryKey: ["Notes"],
+      });
+    },
+    onError: () => {
+      iziToast.error({
+        message: "Error deleting note, please try again",
+        position: "topCenter",
+      });
     },
   });
-
-  if (isLoading) return <Loader />;
-  if (error || !data?.results?.length) return null;
-
   return (
     <ul className={css.list}>
-      {data.results.map((note: Note) => (
-        <li key={note.id} className={css.listItem}>
-          <h2 className={css.title}>{note.title}</h2>
-          <p className={css.content}>{note.content}</p>
-          <div className={css.footer}>
-            <span className={css.tag}>{note.tag}</span>
-            <button className={css.button} onClick={() => mutate(note.id)}>
-              Delete
-            </button>
-          </div>
-        </li>
-      ))}
+      {notes.map((note) => {
+        return (
+          <li key={note.id} className={css.listItem}>
+            <h2 className={css.title}>{note.title}</h2>
+            <p className={css.content}>{note.content}</p>
+            <div className={css.footer}>
+              <span className={css.tag}>{note.tag}</span>
+              <button
+                onClick={() => deleteNote.mutate(note.id)}
+                className={css.button}
+              >
+                Delete
+              </button>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
-
-export default NoteList;

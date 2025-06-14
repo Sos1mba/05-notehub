@@ -1,87 +1,96 @@
-import { Formik, Form, Field, ErrorMessage } from 'formik';
-import * as Yup from 'yup';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createNote } from '../../services/noteService';
-import css from './NoteForm.module.css';
-import type { NoteTag } from '../../types/note'; // Import NoteTag
-
-// Define the shape of your form values
-interface NoteFormValues {
-  title: string;
-  content: string;
-  tag: NoteTag | ''; // Allow empty string for initial value, but ensure it becomes NoteTag on submit
-}
-
-const validationSchema = Yup.object({
-  title: Yup.string().min(3).max(50).required('Required'),
-  content: Yup.string().max(500),
-  tag: Yup.string()
-    .oneOf(['Todo', 'Work', 'Personal', 'Meeting', 'Shopping'])
-    .required('Required'),
-});
+import { Formik, Form, Field, ErrorMessage, type FormikHelpers } from "formik";
+import css from "./NoteForm.module.css";
+import * as Yup from "yup";
+import { type NoteFormData } from "../../types/note";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { createNote } from "../../services/noteService";
+import iziToast from "izitoast";
 
 interface NoteFormProps {
   onClose: () => void;
 }
 
-function NoteForm({ onClose }: NoteFormProps) {
+
+const NoteFormSchema = Yup.object().shape({
+  title: Yup.string()
+    .min(3, "Too short title, min 3 symbols")
+    .max(50, "Too long title, max 50 symbols")
+    .required("Title is required"),
+  content: Yup.string().max(3000, "Too long content, max 3000 symbols"),
+  tag: Yup.string().oneOf(["Todo", "Work", "Personal", "Meeting", "Shopping"]),
+});
+
+export default function NoteForm({ onClose }: NoteFormProps) {
   const queryClient = useQueryClient();
-  const { mutate } = useMutation({
-    mutationFn: createNote,
+  const addNewNote = useMutation({
+    mutationFn: (newNoteData: NoteFormData) => createNote(newNoteData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] });
+      queryClient.invalidateQueries({ queryKey: ["Notes"] });
       onClose();
     },
+    onError: () => {
+      iziToast.error({
+        message: "Error adding note, please try again",
+        position: "topCenter",
+      });
+    },
   });
-
+  const handleSubmit = (values: NoteFormData, actions: FormikHelpers<NoteFormData>) => {
+    addNewNote.mutate(values);
+    actions.resetForm();
+  };
   return (
-    <Formik<NoteFormValues> // Specify the type for Formik
-      initialValues={{ title: '', content: '', tag: '' }}
-      validationSchema={validationSchema}
-      onSubmit={(values) => {
-        // Ensure the tag is cast to NoteTag here
-        mutate({ ...values, tag: values.tag as NoteTag });
+    <Formik
+      initialValues={{
+        title: "",
+        content: "",
+        tag: "Todo",
       }}
+      onSubmit={handleSubmit}
+      validationSchema={NoteFormSchema}
     >
-      {({ isSubmitting }) => (
-        <Form className={css.form}>
-          <div className={css.formGroup}>
-            <label htmlFor="title">Title</label>
-            <Field id="title" name="title" className={css.input} />
-            <ErrorMessage name="title" component="span" className={css.error} />
-          </div>
+      <Form className={css.form}>
+        <div className={css.formGroup}>
+          <label htmlFor="title">Title</label>
+          <Field id="title" type="text" name="title" className={css.input} />
+          <ErrorMessage component="div" name="title" className={css.error} />
+        </div>
 
-          <div className={css.formGroup}>
-            <label htmlFor="content">Content</label>
-            <Field as="textarea" name="content" rows="8" className={css.textarea} />
-            <ErrorMessage name="content" component="span" className={css.error} />
-          </div>
+        <div className={css.formGroup}>
+          <label htmlFor="content">Content</label>
+          <Field
+            as="textarea"
+            id="content"
+            name="content"
+            rows="8"
+            className={css.textarea}
+          />
+          <ErrorMessage component="div" name="content" className={css.error} />
+        </div>
 
-          <div className={css.formGroup}>
-            <label htmlFor="tag">Tag</label>
-            <Field as="select" name="tag" className={css.select}>
-              <option value="">Select tag</option>
-              <option value="Todo">Todo</option>
-              <option value="Work">Work</option>
-              <option value="Personal">Personal</option>
-              <option value="Meeting">Meeting</option>
-              <option value="Shopping">Shopping</option>
-            </Field>
-            <ErrorMessage name="tag" component="span" className={css.error} />
-          </div>
+        <div className={css.formGroup}>
+          <label htmlFor="tag">Tag</label>
+          <Field as="select" id="tag" name="tag" className={css.select}>
+            <option value="Todo">Todo</option>
+            <option value="Work">Work</option>
+            <option value="Personal">Personal</option>
+            <option value="Meeting">Meeting</option>
+            <option value="Shopping">Shopping</option>
+          </Field>
+          <ErrorMessage component="div" name="tag" className={css.error} />
+        </div>
 
-          <div className={css.actions}>
-            <button type="button" onClick={onClose} className={css.cancelButton}>
-              Cancel
-            </button>
-            <button type="submit" disabled={isSubmitting} className={css.submitButton}>
-              Create note
-            </button>
-          </div>
-        </Form>
-      )}
+        <div className={css.actions}>
+          <button type="button" onClick={onClose} className={css.cancelButton}>
+            Cancel
+          </button>
+          <button type="submit" className={css.submitButton}>
+            {addNewNote.isPending && !addNewNote.isSuccess
+              ? `Creating note...`
+              : `Create note`}
+          </button>
+        </div>
+      </Form>
     </Formik>
   );
 }
-
-export default NoteForm;
