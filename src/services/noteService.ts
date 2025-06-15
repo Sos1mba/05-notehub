@@ -4,46 +4,34 @@ import type { Note, NoteFormData } from "../types/note";
 const API_URL = "https://notehub-public.goit.study/api/notes/";
 const NOTES_PER_PAGE = 12;
 
+const token = import.meta.env.VITE_NOTEHUB_TOKEN;
+
 interface NoteHubResponse {
   notes: Note[];
   totalPages: number;
-  totalNotes?: number; // Додано, якщо API повертає
+  totalNotes?: number;
 }
 
-interface NoteHubSearchParams {
-  params: {
-    search?: string;
-    page: number;
-    perPage: number;
-  };
+const getAuthHeaders = () => ({
   headers: {
-    authorization: string;
-  };
-}
-
-const myToken = import.meta.env.VITE_NOTEHUB_TOKEN;
-
-// Додамо інтерцептор для авторизації (якщо використовується в багатьох місцях)
-axios.interceptors.request.use((config) => {
-  if (myToken) {
-    config.headers.Authorization = `Bearer ${myToken}`;
-  }
-  return config;
+    Authorization: `Bearer ${token}`,
+  },
 });
 
-export async function fetchNotes(
-  query: string,
-  page: number
-): Promise<NoteHubResponse> {
+// ---- GET NOTES ----
+export async function fetchNotes(query: string, page: number): Promise<NoteHubResponse> {
   try {
-    const params: NoteHubSearchParams["params"] = {
+    const params = {
       page,
       perPage: NOTES_PER_PAGE,
+      ...(query.trim() !== "" && { search: query.trim() }),
     };
-    if (query.trim() !== "") {
-      params.search = query.trim();
-    }
-    const response = await axios.get<NoteHubResponse>(API_URL, { params });
+
+    const response = await axios.get<NoteHubResponse>(API_URL, {
+      params,
+      ...getAuthHeaders(),
+    });
+
     return response.data;
   } catch (error) {
     console.error("Failed to fetch notes:", error);
@@ -51,9 +39,10 @@ export async function fetchNotes(
   }
 }
 
+// ---- DELETE NOTE ----
 export async function removeNote(id: number): Promise<Note> {
   try {
-    const response = await axios.delete<Note>(`${API_URL}${id}`);
+    const response = await axios.delete<Note>(`${API_URL}${id}`, getAuthHeaders());
     return response.data;
   } catch (error) {
     console.error("Failed to delete note:", error);
@@ -61,9 +50,10 @@ export async function removeNote(id: number): Promise<Note> {
   }
 }
 
+// ---- CREATE NOTE ----
 export async function createNote(note: NoteFormData): Promise<Note> {
   try {
-    const response = await axios.post<Note>(API_URL, note);
+    const response = await axios.post<Note>(API_URL, note, getAuthHeaders());
     return response.data;
   } catch (error) {
     console.error("Failed to create note:", error);

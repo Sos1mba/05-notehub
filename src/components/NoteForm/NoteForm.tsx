@@ -16,9 +16,14 @@ const NoteFormSchema = Yup.object().shape({
     .min(3, "Too short title, min 3 symbols")
     .max(50, "Too long title, max 50 symbols")
     .required("Title is required"),
-  content: Yup.string().max(3000, "Too long content, max 3000 symbols"),
-  tag: Yup.string().oneOf(["Todo", "Work", "Personal", "Meeting", "Shopping"]),
+  content: Yup.string()
+    .max(500, "Too long content, max 500 symbols")
+    .required("Content is required"),
+  tag: Yup.string()
+    .oneOf(["Todo", "Work", "Personal", "Meeting", "Shopping"], "Invalid tag")
+    .required("Tag is required"),
 });
+
 
 export default function NoteForm({ onClose }: NoteFormProps) {
   const queryClient = useQueryClient();
